@@ -289,22 +289,22 @@ function App() {
   // 播放音频并增加点击计数函数
   const playSound = () => {
     if (!hasPlayed) {
-      const audio = new Audio(cachedAudioUrl);
-      // 设置音频起始位置，跳过开头无声音的部分（根据实际情况调整时间值）
-      audio.currentTime = 0.05; // 跳过前0.1秒
-      audio.play().catch(error => {
-        console.error('音频播放失败:', error);
-      });
-      setHasPlayed(true);
+        const audio = new Audio(cachedAudioUrl);
+        // 设置音频起始位置，跳过开头无声音的部分（根据实际情况调整时间值）
+        audio.currentTime = 0.05; // 跳过前0.1秒
+        audio.play().catch(error => {
+          console.error('音频播放失败:', error);
+        });
+        setHasPlayed(true);
 
-      // 调用API增加点击次数
-      incrementCounter().then(success => {
-        if (success) {
-          console.log('点击次数增加成功');
-          // 增加后立即获取最新次数
-          updateCounterValue();
-        }
-      });
+        // 调用API增加点击次数
+        incrementCounter().then(success => {
+          if (success) {
+            console.log('点击次数增加成功');
+            // 增加后立即获取最新次数
+            updateCounterValue();
+          }
+        });
 
       // 生成气泡消息
       createBubbleMessage();
@@ -418,8 +418,16 @@ function App() {
           onMouseDown={playSound}
           onMouseUp={resetPlayState}
           onMouseLeave={resetPlayState}
-          onTouchStart={playSound}
-          onTouchEnd={resetPlayState}
+          onTouchStart={(e) => {
+            // 阻止触摸事件触发鼠标事件
+            e.preventDefault();
+            playSound();
+          }}
+          onTouchEnd={(e) => {
+            // 阻止触摸事件触发鼠标事件
+            e.preventDefault();
+            resetPlayState();
+          }}
           onTouchCancel={resetPlayState}
           className={`interactive-image ${showRedFilter ? 'red-filter' : ''}`}
           touch-action="none"
