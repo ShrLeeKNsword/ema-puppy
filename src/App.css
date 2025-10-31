@@ -1,0 +1,90 @@
+body {
+  background-color: #ffffff;
+}
+
+/* 音频播放图片页面样式 */
+.app-container {
+  display: flex;
+  flex-direction: column;
+  justify-content: center;
+  align-items: center;
+  gap: 20px;
+  width: 100%;
+  min-height: 100vh;
+  box-sizing: border-box;
+  background-color: #ffffff;
+  padding: 20px;
+  touch-action: none; /* 禁止触摸拖拽 */
+  user-select: none; /* 禁止文本选择 */
+}
+
+.interactive-image {
+  max-width: 50%;
+  height: auto;
+  max-height: 80vh;
+  cursor: pointer;
+  transition: transform 0.1s ease, filter 0.3s ease;
+  transform-origin: center;
+  border-radius: 8px;
+}
+
+.interactive-image:hover {
+  transform: scale(1.02);
+}
+
+.interactive-image:active {
+  transform: scaleX(1.2) scaleY(0.8);
+}
+
+.interactive-image.red-filter {
+  filter: sepia(0.8) hue-rotate(-45deg) saturate(2.5);
+}
+
+/* 计数文本样式 */
+.counter-text {
+  font-size: 18px;
+  font-weight: 500;
+  color: #333333;
+  text-align: center;
+  margin-top: 16px;
+}
+
+/* 按钮容器样式 */
+.buttons-container {
+  display: flex;
+  gap: 16px;
+  justify-content: center;
+  margin-top: 20px;
+}
+
+/* 图片容器样式 */
+.image-container {
+  display: flex;
+  justify-content: center;
+  align-items: center;
+}
+
+/* 气泡容器样式 */
+.bubble-container {
+  position: absolute;
+  top: 0;
+  left: 0;
+  width: 100%;
+  height: 100%;
+  overflow: hidden;
+  pointer-events: none;
+  z-index: 10;
+}
+
+/* 气泡消息样式 */
+.bubble-message {
+  position: absolute;
+  font-size: 14px;
+  color: #333;
+  background-color: rgba(255, 255, 255, 0.9);
+  padding: 4px 8px;
+  border-radius: 4px;
+  box-shadow: 0 2px 4px rgba(0, 0, 0, 0.2);
+  pointer-events: none; /* 不响应鼠标事件 */
+  white-space: nowrap;
+}

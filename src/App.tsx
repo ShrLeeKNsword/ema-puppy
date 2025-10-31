@@ -1,0 +1,434 @@
+import { useState, useEffect, useRef } from 'react'
+import './App.css'
+// 导入音频文件
+import audioFile from './assets/ema.ogg'
+// 导入图片数据
+import { images } from './data/img'
+// 导入API函数
+import { incrementCounter, getCounterValue } from './data/api';
+import { artists } from './data/artists';
+// 导入semiUI按钮组件
+import { Button } from '@douyinfe/semi-ui';
+
+// 图片缓存服务
+interface CachedImage {
+  data: string;
+  timestamp: number;
+  alt: string;
+}
+
+// 缓存过期时间：24小时（单位：毫秒）
+const CACHE_EXPIRY_TIME = 24 * 60 * 60 * 1000;
+
+// 获取缓存的图片
+export const getCachedImage = (url: string): CachedImage | null => {
+  try {
+    const cached = localStorage.getItem(`image_cache_${url}`);
+    if (!cached) return null;
+    
+    const parsed = JSON.parse(cached) as CachedImage;
+    const now = Date.now();
+    
+    // 检查缓存是否过期
+    if (now - parsed.timestamp > CACHE_EXPIRY_TIME) {
+      localStorage.removeItem(`image_cache_${url}`);
+      return null;
+    }
+    
+    return parsed;
+  } catch (error) {
+    console.error('从缓存获取图片失败:', error);
+    return null;
+  }
+};
+
+// 缓存图片
+export const cacheImage = (url: string, data: string, alt: string): void => {
+  try {
+    const cachedImage: CachedImage = {
+      data,
+      timestamp: Date.now(),
+      alt
+    };
+    localStorage.setItem(`image_cache_${url}`, JSON.stringify(cachedImage));
+  } catch (error) {
+    console.error('缓存图片失败:', error);
+  }
+};
+
+// 从URL加载图片并转换为base64
+export const loadImageAsBase64 = (url: string, alt: string): Promise<string> => {
+  return new Promise((resolve, reject) => {
+    // 检查是否已有缓存
+    const cached = getCachedImage(url);
+    if (cached) {
+      resolve(cached.data);
+      return;
+    }
+    
+    const img = new Image();
+    img.crossOrigin = 'Anonymous'; // 允许跨域加载
+    
+    img.onload = () => {
+      const canvas = document.createElement('canvas');
+      canvas.width = img.width;
+      canvas.height = img.height;
+      
+      const ctx = canvas.getContext('2d');
+      if (!ctx) {
+        reject(new Error('无法创建canvas上下文'));
+        return;
+      }
+      
+      ctx.drawImage(img, 0, 0);
+      
+      // 将图片转换为base64
+      const dataUrl = canvas.toDataURL('image/png');
+      
+      // 缓存图片
+      cacheImage(url, dataUrl, alt);
+      
+      resolve(dataUrl);
+    };
+    
+    img.onerror = () => {
+      // 如果加载失败，返回原始URL作为后备
+      console.error(`图片加载失败: ${url}`);
+      resolve(url);
+    };
+    
+    img.src = url;
+  });
+};
+
+// 预加载并缓存所有图片
+export const preloadAndCacheImages = async (imageList: typeof images): Promise<void> => {
+  try {
+    const promises = imageList.map(img => loadImageAsBase64(img.url, img.alt));
+    await Promise.all(promises);
+    console.log('所有图片已预加载并缓存');
+  } catch (error) {
+    console.error('预加载图片失败:', error);
+  }
+};
+
+// 定义气泡消息类型
+interface BubbleMessage {
+  id: string;
+  x: number;
+  y: number;
+  opacity: number;
+  translateY: number;
+}
+
+function App() {
+  // 用于跟踪当前按下过程中是否已播放音频
+  const [hasPlayed, setHasPlayed] = useState(false);
+  // 用于存储点击次数
+  const [clickCount, setClickCount] = useState(0);
+  // 用于存储气泡消息
+  const [bubbleMessages, setBubbleMessages] = useState<BubbleMessage[]>([]);
+  // 图片元素引用，用于获取位置信息
+  const imageRef = useRef<HTMLImageElement>(null);
+  // 当前选中的随机图片
+  const [currentImage, setCurrentImage] = useState(images[0]);
+  // 是否显示红色滤镜（长按超过3秒）
+  const [showRedFilter, setShowRedFilter] = useState(false);
+  // 是否显示艺术家信息模态框
+  const [showArtistModal, setShowArtistModal] = useState(false);
+  // 长按定时器引用
+  const longPressTimerRef = useRef<number | null>(null);
+  
+
+
+  // 组件挂载时预加载所有图片并随机选择一张
+  useEffect(() => {
+    // 预加载所有图片到缓存
+    preloadAndCacheImages(images);
+    
+    // 随机选择并加载一张图片
+    const loadRandomImage = async () => {
+      const randomIndex = Math.floor(Math.random() * images.length);
+      const selectedImage = images[randomIndex];
+      
+      try {
+        // 尝试从缓存加载图片
+        const cached = getCachedImage(selectedImage.url);
+        if (cached) {
+          // 如果有缓存，使用缓存的图片
+          setCurrentImage({ ...selectedImage, url: cached.data });
+        } else {
+          // 否则加载并缓存图片
+          const base64Data = await loadImageAsBase64(selectedImage.url, selectedImage.alt);
+          setCurrentImage({ ...selectedImage, url: base64Data });
+        }
+      } catch (error) {
+        console.error('加载图片失败:', error);
+        // 如果出错，使用原始图片URL
+        setCurrentImage(selectedImage);
+      }
+    };
+    
+    loadRandomImage();
+  }, []);
+
+  // 清理定时器
+  useEffect(() => {
+    return () => {
+      if (longPressTimerRef.current) {
+        clearTimeout(longPressTimerRef.current);
+      }
+    };
+  }, []);
+
+  // 播放音频并增加点击计数函数
+  const playSound = () => {
+    if (!hasPlayed) {
+      const audio = new Audio(audioFile);
+      // 设置音频起始位置，跳过开头无声音的部分（根据实际情况调整时间值）
+      audio.currentTime = 0.05; // 跳过前0.1秒
+      audio.play().catch(error => {
+        console.error('音频播放失败:', error);
+      });
+      setHasPlayed(true);
+
+      // 调用API增加点击次数
+      incrementCounter().then(success => {
+        if (success) {
+          console.log('点击次数增加成功');
+          // 增加后立即获取最新次数
+          updateCounterValue();
+        }
+      });
+
+      // 生成气泡消息
+      createBubbleMessage();
+    }
+
+    // 设置长按定时器（1.5秒后显示红色滤镜）
+    longPressTimerRef.current = setTimeout(() => {
+      setShowRedFilter(true);
+    }, 1500);
+  };
+
+  // 更新计数函数
+  const updateCounterValue = async () => {
+    const count = await getCounterValue();
+    if (count !== -1) { // 只有在获取成功时才更新
+      setClickCount(count);
+    }
+  };
+
+  // 创建气泡消息函数
+  const createBubbleMessage = () => {
+    // 限制最大气泡数量为100
+    if (bubbleMessages.length >= 100) {
+      return;
+    }
+
+    // 获取图片元素的位置信息
+    if (imageRef.current) {
+      const rect = imageRef.current.getBoundingClientRect();
+      // 计算相对于屏幕的绝对位置，确保气泡从图片区域产生
+      const x = rect.left + rect.width * 0.1 + Math.random() * rect.width * 0.6; // 图片左侧10%到70%范围内
+      const y = rect.top + rect.height * 0.2; // 图片上方20%高度处开始
+
+      // 创建新的气泡消息
+      const newBubble: BubbleMessage = {
+        id: Date.now().toString() + Math.random().toString(36).substr(2, 9),
+        x,
+        y,
+        opacity: 1,
+        translateY: 0
+      };
+
+      // 添加新气泡到状态中
+      setBubbleMessages(prev => [...prev, newBubble]);
+
+      // 设置动画定时器
+      setTimeout(() => {
+        // 动画结束后移除气泡
+        setBubbleMessages(prev => prev.filter(bubble => bubble.id !== newBubble.id));
+      }, 2000); // 2秒后移除
+    }
+  };
+
+  // 更新气泡动画状态
+  useEffect(() => {
+    if (bubbleMessages.length === 0) return;
+
+    // 每50ms更新一次动画状态
+    const interval = setInterval(() => {
+      setBubbleMessages(prev =>
+        prev.map(bubble => ({
+          ...bubble,
+          // 向上移动
+          translateY: bubble.translateY - 5,
+          // 逐渐淡出
+          opacity: bubble.opacity - 0.025
+        }))
+      );
+    }, 50);
+
+    return () => clearInterval(interval);
+  }, [bubbleMessages.length]);
+
+  // 重置播放状态函数
+  const resetPlayState = () => {
+    setHasPlayed(false);
+
+    // 清除长按定时器
+    if (longPressTimerRef.current) {
+      clearTimeout(longPressTimerRef.current);
+      longPressTimerRef.current = null;
+    }
+
+    // 解除红色滤镜
+    setShowRedFilter(false);
+  };
+
+  // 设置定时器，每5秒获取一次最新的点击次数
+  useEffect(() => {
+    // 组件挂载时获取初始次数
+    updateCounterValue();
+
+    // 设置定时器
+    const interval = setInterval(() => {
+      updateCounterValue();
+    }, 1000); // 1秒间隔
+
+    // 清理函数
+    return () => {
+      clearInterval(interval);
+    };
+  }, []);
+
+  return (
+    <div className="app-container">
+      <div className="image-container">
+        <img
+          ref={imageRef}
+          src={currentImage.url}
+          alt={currentImage.alt}
+          onMouseDown={playSound}
+          onMouseUp={resetPlayState}
+          onMouseLeave={resetPlayState}
+          onTouchStart={playSound}
+          onTouchEnd={resetPlayState}
+          onTouchCancel={resetPlayState}
+          className={`interactive-image ${showRedFilter ? 'red-filter' : ''}`}
+          touch-action="none"
+        />
+      </div>
+      {/* 渲染所有气泡消息 - 与图片分离 */}
+      <div className="bubble-container">
+        {bubbleMessages.map(bubble => (
+          <div
+            key={bubble.id}
+            className="bubble-message"
+            style={{
+              opacity: bubble.opacity,
+              transform: `translate(${bubble.x}px, ${bubble.y + bubble.translateY}px)`
+            }}
+          >
+            您已消耗一次免费触摸机会
+          </div>
+        ))}
+      </div>
+      <div className="counter-text">
+        艾玛累计一共Kya了 {clickCount} 次
+      </div>
+      <div className="buttons-container">
+        <Button type="tertiary" onClick={() => window.open('https://space.bilibili.com/403314450', '_blank')}>网站作者</Button>
+        <Button type="tertiary" onClick={() => setShowArtistModal(true)}>图片画师</Button>
+      </div>
+      
+      {/* 原生React实现的模态框 */}
+      {showArtistModal && (
+        <div style={{
+          position: 'fixed',
+          top: 0,
+          left: 0,
+          right: 0,
+          bottom: 0,
+          backgroundColor: 'rgba(0, 0, 0, 0.5)',
+          display: 'flex',
+          alignItems: 'center',
+          justifyContent: 'center',
+          zIndex: 1000
+        }}>
+          <div style={{
+            backgroundColor: 'white',
+            borderRadius: '8px',
+            width: '600px',
+            maxWidth: '90%',
+            maxHeight: '80vh',
+            overflow: 'auto',
+            padding: '0'
+          }}>
+            <div style={{
+              padding: '20px',
+              borderBottom: '1px solid #f0f0f0',
+              display: 'flex',
+              justifyContent: 'space-between',
+              alignItems: 'center'
+            }}>
+              <h2 style={{ margin: 0, fontSize: '18px' }}>图片画师</h2>
+              <button
+                onClick={() => setShowArtistModal(false)}
+                style={{
+                  border: 'none',
+                  background: 'none',
+                  fontSize: '24px',
+                  cursor: 'pointer',
+                  color: '#999'
+                }}
+              >
+                ×
+              </button>
+            </div>
+            <div style={{ padding: '20px', display: 'grid', gridTemplateColumns: 'repeat(2, 1fr)', gap: '16px' }}>
+              {artists && artists.map((artist) => (
+                <button
+                  key={artist.id}
+                  onClick={() => window.open(artist.url, '_blank')}
+                  style={{
+                    padding: '10px 20px',
+                    border: '1px solid #d9d9d9',
+                    borderRadius: '6px',
+                    backgroundColor: 'white',
+                    cursor: 'pointer',
+                    fontSize: '16px'
+                  }}
+                >
+                  {artist.name}
+                </button>
+              ))}
+            </div>
+            <div style={{
+              padding: '20px',
+              borderTop: '1px solid #f0f0f0',
+              display: 'flex',
+              justifyContent: 'flex-end'
+            }}>
+              <button
+                onClick={() => setShowArtistModal(false)}
+                style={{
+                  padding: '8px 24px',
+                  border: '1px solid #d9d9d9',
+                  borderRadius: '6px',
+                  backgroundColor: 'white',
+                  cursor: 'pointer'
+                }}
+              >
+                关闭
+              </button>
+            </div>
+          </div>
+        </div>
+      )}
+    </div>
+  )
+}
+
+export default App

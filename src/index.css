@@ -1,0 +1,15 @@
+/* 清空所有全局样式 */
+* {
+  margin: 0;
+  padding: 0;
+  box-sizing: border-box;
+}
+
+body {
+  background-color: white;
+  color: black;
+  touch-action: none; /* 禁止触摸拖拽 */
+  user-select: none; /* 禁止文本选择 */
+  -webkit-touch-callout: none; /* 禁止iOS长按菜单 */
+  -webkit-user-drag: none; /* 禁止元素被拖拽 */
+}
