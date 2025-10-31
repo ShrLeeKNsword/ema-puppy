@@ -2,6 +2,18 @@ body {
   background-color: #ffffff;
 }
 
+/* 全局样式 */
+* {
+  margin: 0;
+  padding: 0;
+  box-sizing: border-box;
+  -webkit-tap-highlight-color: transparent; /* 去除点击高亮 */
+  -webkit-user-select: none; /* 禁止iOS选择 */
+  -moz-user-select: none; /* 禁止Firefox选择 */
+  -ms-user-select: none; /* 禁止IE选择 */
+  user-select: none; /* 禁止选择 */
+}
+
 /* 音频播放图片页面样式 */
 .app-container {
   display: flex;
@@ -16,6 +28,8 @@ body {
   padding: 20px;
   touch-action: none; /* 禁止触摸拖拽 */
   user-select: none; /* 禁止文本选择 */
+  -webkit-touch-callout: none; /* 禁止iOS长按菜单 */
+  -webkit-user-drag: none; /* 禁止iOS拖拽 */
 }
 
 .interactive-image {
@@ -26,6 +40,20 @@ body {
   transition: transform 0.1s ease, filter 0.3s ease;
   transform-origin: center;
   border-radius: 8px;
+  /* 防止图片保存的样式 */
+  -webkit-touch-callout: none; /* 禁止iOS长按菜单 */
+  -webkit-user-drag: none; /* 禁止iOS拖拽 */
+  -webkit-user-select: none; /* 禁止iOS选择 */
+  -moz-user-select: none; /* 禁止Firefox选择 */
+  -ms-user-select: none; /* 禁止IE选择 */
+  user-select: none; /* 禁止选择 */
+  /* 防止右键菜单 */
+  pointer-events: auto;
+  /* 禁止复制粘贴 */
+  -webkit-text-size-adjust: none;
+  -moz-text-size-adjust: none;
+  -ms-text-size-adjust: none;
+  text-size-adjust: none;
 }
 
 .interactive-image:hover {

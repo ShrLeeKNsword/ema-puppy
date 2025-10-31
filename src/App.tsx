@@ -429,8 +429,20 @@ function App() {
             resetPlayState();
           }}
           onTouchCancel={resetPlayState}
+          // 禁止右键菜单
+          onContextMenu={(e) => e.preventDefault()}
+          // 禁止拖拽图片
+          onDragStart={(e) => e.preventDefault()}
+          // 禁止长按事件（防止保存图片）
+          onTouchMove={(e) => e.preventDefault()}
           className={`interactive-image ${showRedFilter ? 'red-filter' : ''}`}
           touch-action="none"
+          // 添加内联样式防止选择
+          style={{
+            userSelect: 'none',
+            WebkitUserSelect: 'none',
+            msUserSelect: 'none'
+          }}
         />
       </div>
       {/* 渲染所有气泡消息 - 与图片分离 */}
