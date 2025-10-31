@@ -64,6 +64,12 @@ body {
   transform: scaleX(1.2) scaleY(0.8);
 }
 
+/* 移动设备触摸状态动画 */
+.interactive-image.touch-active {
+  transform: scaleX(1.2) scaleY(0.8);
+  transition: transform 0.1s ease;
+}
+
 .interactive-image.red-filter {
   filter: sepia(0.8) hue-rotate(-45deg) saturate(2.5);
 }

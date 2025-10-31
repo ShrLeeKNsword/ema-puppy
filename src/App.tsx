@@ -232,6 +232,8 @@ function App() {
   const longPressTimerRef = useRef<number | null>(null);
   // 预加载的音频数据URL
   const [cachedAudioUrl, setCachedAudioUrl] = useState<string>(audioFile);
+  // 控制移动端触摸状态（用于动画）
+  const [isTouching, setIsTouching] = useState(false);
   
   // 组件挂载时预加载所有图片和音频
   useEffect(() => {
@@ -421,21 +423,29 @@ function App() {
           onTouchStart={(e) => {
             // 阻止触摸事件触发鼠标事件
             e.preventDefault();
+            // 设置触摸状态为true，用于动画
+            setIsTouching(true);
             playSound();
           }}
           onTouchEnd={(e) => {
             // 阻止触摸事件触发鼠标事件
             e.preventDefault();
+            // 设置触摸状态为false
+            setIsTouching(false);
             resetPlayState();
           }}
-          onTouchCancel={resetPlayState}
+          onTouchCancel={() => {
+            // 设置触摸状态为false
+            setIsTouching(false);
+            resetPlayState();
+          }}
           // 禁止右键菜单
           onContextMenu={(e) => e.preventDefault()}
           // 禁止拖拽图片
           onDragStart={(e) => e.preventDefault()}
           // 禁止长按事件（防止保存图片）
           onTouchMove={(e) => e.preventDefault()}
-          className={`interactive-image ${showRedFilter ? 'red-filter' : ''}`}
+          className={`interactive-image ${showRedFilter ? 'red-filter' : ''} ${isTouching ? 'touch-active' : ''}`}
           touch-action="none"
           // 添加内联样式防止选择
           style={{
