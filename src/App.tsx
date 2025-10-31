@@ -10,6 +10,9 @@ import { artists } from './data/artists';
 // 导入semiUI按钮组件
 import { Button } from '@douyinfe/semi-ui';
 
+// 缓存过期时间：24小时（单位：毫秒）
+const CACHE_EXPIRY_TIME = 24 * 60 * 60 * 1000;
+
 // 图片缓存服务
 interface CachedImage {
   data: string;
@@ -17,8 +20,11 @@ interface CachedImage {
   alt: string;
 }
 
-// 缓存过期时间：24小时（单位：毫秒）
-const CACHE_EXPIRY_TIME = 24 * 60 * 60 * 1000;
+// 音频缓存服务
+interface CachedAudio {
+  data: string;
+  timestamp: number;
+}
 
 // 获取缓存的图片
 export const getCachedImage = (url: string): CachedImage | null => {
@@ -53,6 +59,92 @@ export const cacheImage = (url: string, data: string, alt: string): void => {
     localStorage.setItem(`image_cache_${url}`, JSON.stringify(cachedImage));
   } catch (error) {
     console.error('缓存图片失败:', error);
+  }
+};
+
+// 获取缓存的音频
+export const getCachedAudio = (url: string): CachedAudio | null => {
+  try {
+    const cached = localStorage.getItem(`audio_cache_${url}`);
+    if (!cached) return null;
+    
+    const parsed = JSON.parse(cached) as CachedAudio;
+    const now = Date.now();
+    
+    // 检查缓存是否过期
+    if (now - parsed.timestamp > CACHE_EXPIRY_TIME) {
+      localStorage.removeItem(`audio_cache_${url}`);
+      return null;
+    }
+    
+    return parsed;
+  } catch (error) {
+    console.error('从缓存获取音频失败:', error);
+    return null;
+  }
+};
+
+// 缓存音频
+export const cacheAudio = (url: string, data: string): void => {
+  try {
+    const cachedAudio: CachedAudio = {
+      data,
+      timestamp: Date.now()
+    };
+    localStorage.setItem(`audio_cache_${url}`, JSON.stringify(cachedAudio));
+  } catch (error) {
+    console.error('缓存音频失败:', error);
+  }
+};
+
+// 从URL加载音频并转换为base64
+export const loadAudioAsBase64 = (url: string): Promise<string> => {
+  return new Promise((resolve, reject) => {
+    // 检查是否已有缓存
+    const cached = getCachedAudio(url);
+    if (cached) {
+      resolve(cached.data);
+      return;
+    }
+    
+    // 使用fetch API加载音频文件
+    fetch(url)
+      .then(response => {
+        if (!response.ok) {
+          throw new Error(`音频加载失败: ${response.status}`);
+        }
+        return response.blob();
+      })
+      .then(blob => {
+        const reader = new FileReader();
+        reader.onload = () => {
+          const dataUrl = reader.result as string;
+          // 缓存音频
+          cacheAudio(url, dataUrl);
+          resolve(dataUrl);
+        };
+        reader.onerror = () => {
+          reject(new Error('无法读取音频文件'));
+        };
+        reader.readAsDataURL(blob);
+      })
+      .catch(error => {
+        console.error('音频加载失败:', error);
+        // 如果加载失败，返回原始URL作为后备
+        resolve(url);
+      });
+  });
+};
+
+// 预加载并缓存音频
+export const preloadAndCacheAudio = async (audioUrl: string): Promise<string> => {
+  try {
+    const audioData = await loadAudioAsBase64(audioUrl);
+    console.log('音频已预加载并缓存');
+    return audioData;
+  } catch (error) {
+    console.error('预加载音频失败:', error);
+    return audioUrl; // 返回原始URL作为后备
   }
 };
 
@@ -138,13 +230,24 @@ function App() {
   const [showArtistModal, setShowArtistModal] = useState(false);
   // 长按定时器引用
   const longPressTimerRef = useRef<number | null>(null);
+  // 预加载的音频数据URL
+  const [cachedAudioUrl, setCachedAudioUrl] = useState<string>(audioFile);
   
-
-
-  // 组件挂载时预加载所有图片并随机选择一张
+  // 组件挂载时预加载所有图片和音频
   useEffect(() => {
     // 预加载所有图片到缓存
     preloadAndCacheImages(images);
+    
+    // 预加载音频到缓存
+    const loadAudio = async () => {
+      try {
+        const audioData = await preloadAndCacheAudio(audioFile);
+        setCachedAudioUrl(audioData);
+      } catch (error) {
+        console.error('音频预加载失败:', error);
+        // 如果预加载失败，继续使用原始URL
+      }
+    };
     
     // 随机选择并加载一张图片
     const loadRandomImage = async () => {
@@ -169,6 +272,8 @@ function App() {
       }
     };
     
+    // 并行加载音频和图片
+    loadAudio();
     loadRandomImage();
   }, []);
 
@@ -184,7 +289,7 @@ function App() {
   // 播放音频并增加点击计数函数
   const playSound = () => {
     if (!hasPlayed) {
-      const audio = new Audio(audioFile);
+      const audio = new Audio(cachedAudioUrl);
       // 设置音频起始位置，跳过开头无声音的部分（根据实际情况调整时间值）
       audio.currentTime = 0.05; // 跳过前0.1秒
       audio.play().catch(error => {
