@@ -299,13 +299,18 @@ function App() {
         });
         setHasPlayed(true);
 
-        // 调用API增加点击次数
+        // 调用API增加点击次数，即使失败也不影响用户体验
         incrementCounter().then(success => {
           if (success) {
             console.log('点击次数增加成功');
-            // 增加后立即获取最新次数
-            updateCounterValue();
+          } else {
+            console.log('点击次数增加失败，但不影响使用');
           }
+          // 无论成功与否都尝试更新计数，提供更好的用户体验
+          updateCounterValue();
+        }).catch(error => {
+          console.error('API调用异常:', error);
+          // 即使出现异常也不阻止用户体验
         });
 
       // 生成气泡消息
@@ -394,7 +399,7 @@ function App() {
     setShowRedFilter(false);
   };
 
-  // 设置定时器，每5秒获取一次最新的点击次数
+  // 设置定时器，每10秒获取一次最新的点击次数
   useEffect(() => {
     // 组件挂载时获取初始次数
     updateCounterValue();
@@ -402,7 +407,7 @@ function App() {
     // 设置定时器
     const interval = setInterval(() => {
       updateCounterValue();
-    }, 1000); // 1秒间隔
+    }, 10000); // 10秒间隔
 
     // 清理函数
     return () => {

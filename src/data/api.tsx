@@ -1,7 +1,7 @@
 // API配置信息
 const API_CONFIG = {
-  INCREMENT_URL: 'https://js.ruseo.cn/api/counter.php?api_key=75715be196b2821b25483e8d15ac02c4&action=increment&counter_id=dcdf26f005a6863f23d3a0f7fb80757d&value=1',
-  GET_COUNT_URL: 'https://js.ruseo.cn/api/counter.php?api_key=75715be196b2821b25483e8d15ac02c4&action=get&counter_id=dcdf26f005a6863f23d3a0f7fb80757d'
+  INCREMENT_URL: 'https://add.ema.mocai.fsltech.cn',
+  GET_COUNT_URL: 'https://fetch.ema.mocai.fsltech.cn'
 };
 
 /**
