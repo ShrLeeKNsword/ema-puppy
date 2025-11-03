@@ -50,6 +50,22 @@ export const images: ImageData[] = [
     id: 3,
     url: 'https://cdn.sa.net/2025/11/01/EeAl94KrsCNPGtZ.png',
     alt: 'doro'
+  },
+  {
+    id: 4,
+    url: [
+      {
+        state: 0,
+        src: 'https://cdn.sa.net/2025/11/03/1q28KfiSzFUEXT4.png',
+        alt: '蓄力'  
+      },
+      {
+        state: 1,
+        src: 'https://cdn.sa.net/2025/11/03/ZOkJC3HQt2WYISe.png',
+        alt: '哈'  
+      }
+    ],
+    alt: '哈'
   }
 ];
 
