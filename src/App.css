@@ -62,16 +62,21 @@ body {
 
 .interactive-image:active {
   transform: scaleX(1.2) scaleY(0.8);
+  /* 保留filter属性的过渡效果 */
+  transition: transform 0.1s ease, filter 0.3s ease;
 }
 
 /* 移动设备触摸状态动画 */
 .interactive-image.touch-active {
   transform: scaleX(1.2) scaleY(0.8);
-  transition: transform 0.1s ease;
+  /* 保留filter属性的过渡效果 */
+  transition: transform 0.1s ease, filter 0.3s ease;
 }
 
 .interactive-image.red-filter {
   filter: sepia(0.8) hue-rotate(-45deg) saturate(2.5);
+  /* 确保滤镜有过渡效果 */
+  transition: transform 0.1s ease, filter 0.3s ease;
 }
 
 /* 计数文本样式 */

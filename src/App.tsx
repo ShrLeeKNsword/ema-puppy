@@ -2,10 +2,35 @@ import { useState, useEffect, useRef } from 'react'
 import './App.css'
 // 导入音频文件
 import audioFile from './assets/ema.ogg'
-// 导入图片数据
-import { images } from './data/img'
-// 导入API函数
-import { incrementCounter, getCounterValue } from './data/api';
+// 导入图片数据和辅助函数
+import { images, getDefaultImageUrl, getPressedImageUrl, getDefaultImageAlt, getPressedImageAlt } from './data/img'
+import type { ImageData } from './data/img'
+// 本地计数存储键名
+const CLICK_COUNT_STORAGE_KEY = 'ema_puppy_click_count';
+
+// 获取本地存储的点击计数
+export const getLocalClickCount = (): number => {
+  try {
+    const stored = localStorage.getItem(CLICK_COUNT_STORAGE_KEY);
+    return stored ? parseInt(stored, 10) || 0 : 0;
+  } catch (error) {
+    console.error('获取本地计数失败:', error);
+    return 0;
+  }
+};
+
+// 增加本地点击计数并返回新值
+export const incrementLocalClickCount = (): number => {
+  try {
+    const currentCount = getLocalClickCount();
+    const newCount = currentCount + 1;
+    localStorage.setItem(CLICK_COUNT_STORAGE_KEY, newCount.toString());
+    return newCount;
+  } catch (error) {
+    console.error('增加本地计数失败:', error);
+    return getLocalClickCount();
+  }
+};
 import { artists } from './data/artists';
 // 导入semiUI按钮组件
 import { Button } from '@douyinfe/semi-ui';
@@ -193,10 +218,35 @@ export const loadImageAsBase64 = (url: string, alt: string): Promise<string> => 
   });
 };
 
+
+
 // 预加载并缓存所有图片
-export const preloadAndCacheImages = async (imageList: typeof images): Promise<void> => {
+export const preloadAndCacheImages = async (imageList: ImageData[]): Promise<void> => {
   try {
-    const promises = imageList.map(img => loadImageAsBase64(img.url, img.alt));
+    // 收集所有需要预加载的图片URL和alt
+    const allImagesToLoad: {url: string, alt: string}[] = [];
+    
+    imageList.forEach(img => {
+      // 预加载默认状态的图片
+      allImagesToLoad.push({
+        url: getDefaultImageUrl(img),
+        alt: getDefaultImageAlt(img)
+      });
+      
+      // 如果是多状态图片，还需要预加载按下状态的图片
+      if (Array.isArray(img.url)) {
+        const pressedImage = img.url.find(imgState => imgState.state === 1);
+        if (pressedImage && pressedImage.src !== getDefaultImageUrl(img)) {
+          allImagesToLoad.push({
+            url: pressedImage.src,
+            alt: pressedImage.alt
+          });
+        }
+      }
+    });
+    
+    // 执行预加载
+    const promises = allImagesToLoad.map(img => loadImageAsBase64(img.url, img.alt));
     await Promise.all(promises);
     console.log('所有图片已预加载并缓存');
   } catch (error) {
@@ -216,8 +266,8 @@ interface BubbleMessage {
 function App() {
   // 用于跟踪当前按下过程中是否已播放音频
   const [hasPlayed, setHasPlayed] = useState(false);
-  // 用于存储点击次数
-  const [clickCount, setClickCount] = useState(0);
+  // 用于存储点击次数，从本地存储初始化
+  const [clickCount, setClickCount] = useState(getLocalClickCount());
   // 用于存储气泡消息
   const [bubbleMessages, setBubbleMessages] = useState<BubbleMessage[]>([]);
   // 图片元素引用，用于获取位置信息
@@ -257,19 +307,29 @@ function App() {
       const selectedImage = images[randomIndex];
       
       try {
-        // 尝试从缓存加载图片
-        const cached = getCachedImage(selectedImage.url);
-        if (cached) {
-          // 如果有缓存，使用缓存的图片
-          setCurrentImage({ ...selectedImage, url: cached.data });
-        } else {
-          // 否则加载并缓存图片
-          const base64Data = await loadImageAsBase64(selectedImage.url, selectedImage.alt);
-          setCurrentImage({ ...selectedImage, url: base64Data });
+        // 尝试从缓存加载默认状态图片
+        const defaultUrl = getDefaultImageUrl(selectedImage);
+        const cached = getCachedImage(defaultUrl);
+        
+        // 无论是否有缓存，都保持原始图片结构
+        // 缓存的图片会在渲染时通过辅助函数获取
+        setCurrentImage(selectedImage);
+        
+        // 如果没有缓存，主动加载并缓存图片（不改变数据结构）
+        if (!cached) {
+          await loadImageAsBase64(defaultUrl, getDefaultImageAlt(selectedImage));
+        }
+        
+        // 如果是多状态图片，也预加载按下状态的图片
+        if (Array.isArray(selectedImage.url)) {
+          const pressedUrl = getPressedImageUrl(selectedImage);
+          if (pressedUrl !== defaultUrl && !getCachedImage(pressedUrl)) {
+            await loadImageAsBase64(pressedUrl, getPressedImageAlt(selectedImage));
+          }
         }
       } catch (error) {
         console.error('加载图片失败:', error);
-        // 如果出错，使用原始图片URL
+        // 如果出错，使用原始图片
         setCurrentImage(selectedImage);
       }
     };
@@ -299,19 +359,12 @@ function App() {
         });
         setHasPlayed(true);
 
-        // 调用API增加点击次数，即使失败也不影响用户体验
-        incrementCounter().then(success => {
-          if (success) {
-            console.log('点击次数增加成功');
-          } else {
-            console.log('点击次数增加失败，但不影响使用');
-          }
-          // 无论成功与否都尝试更新计数，提供更好的用户体验
-          updateCounterValue();
-        }).catch(error => {
-          console.error('API调用异常:', error);
-          // 即使出现异常也不阻止用户体验
-        });
+        // 增加本地点击计数
+        const newCount = incrementLocalClickCount();
+        console.log('点击次数增加:', newCount);
+        
+        // 立即更新计数显示
+        updateCounterValue();
 
       // 生成气泡消息
       createBubbleMessage();
@@ -324,11 +377,10 @@ function App() {
   };
 
   // 更新计数函数
-  const updateCounterValue = async () => {
-    const count = await getCounterValue();
-    if (count !== -1) { // 只有在获取成功时才更新
-      setClickCount(count);
-    }
+  const updateCounterValue = () => {
+    // 使用本地计数替代API调用
+    const count = getLocalClickCount();
+    setClickCount(count);
   };
 
   // 创建气泡消息函数
@@ -342,7 +394,7 @@ function App() {
     if (imageRef.current) {
       const rect = imageRef.current.getBoundingClientRect();
       // 计算相对于屏幕的绝对位置，确保气泡从图片区域产生
-      const x = rect.left + rect.width * 0.1 + Math.random() * rect.width * 0.6; // 图片左侧10%到70%范围内
+      const x = rect.left - rect.width * 0.3 + Math.random() * rect.width * 0.6; // 图片左侧10%到70%范围内
       const y = rect.top + rect.height * 0.2; // 图片上方20%高度处开始
 
       // 创建新的气泡消息
@@ -415,16 +467,29 @@ function App() {
     };
   }, []);
 
+
   return (
     <div className="app-container">
       <div className="image-container">
         <img
           ref={imageRef}
-          src={currentImage.url}
-          alt={currentImage.alt}
-          onMouseDown={playSound}
-          onMouseUp={resetPlayState}
-          onMouseLeave={resetPlayState}
+          src={isTouching ? getPressedImageUrl(currentImage) : getDefaultImageUrl(currentImage)}
+          alt={isTouching ? getPressedImageAlt(currentImage) : getDefaultImageAlt(currentImage)}
+          onMouseDown={(_e) => {
+            // 设置触摸状态为true，用于图片切换
+            setIsTouching(true);
+            playSound();
+          }}
+          onMouseUp={(_e) => {
+            // 设置触摸状态为false
+            setIsTouching(false);
+            resetPlayState();
+          }}
+          onMouseLeave={(_e) => {
+            // 设置触摸状态为false
+            setIsTouching(false);
+            resetPlayState();
+          }}
           onTouchStart={(e) => {
             // 阻止触摸事件触发鼠标事件
             e.preventDefault();
