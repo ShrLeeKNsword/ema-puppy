@@ -394,7 +394,7 @@ function App() {
     if (imageRef.current) {
       const rect = imageRef.current.getBoundingClientRect();
       // 计算相对于屏幕的绝对位置，确保气泡从图片区域产生
-      const x = rect.left - rect.width * 0.3 + Math.random() * rect.width * 0.6; // 图片左侧10%到70%范围内
+      const x = rect.left + Math.random() * rect.width * 0.6; // 图片左侧10%到70%范围内
       const y = rect.top + rect.height * 0.2; // 图片上方20%高度处开始
 
       // 创建新的气泡消息
