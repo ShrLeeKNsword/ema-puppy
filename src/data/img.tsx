@@ -94,6 +94,38 @@ export const images: ImageData[] = [
     ],
     alt: 'O^O'
   },
+  {
+    id: 6,
+    url: [
+      {
+        state: 0,
+        src: 'https://cdn.sa.net/2025/11/04/fDbyVET8oBxOmwl.png',
+        alt: 'OUO'
+      },
+      {
+        state: 1,
+        src: 'https://cdn.sa.net/2025/11/04/lbf79RXEJS6Lyw2.png',
+        alt: 'TUT'
+      }
+    ],
+    alt: 'Hiro酱'
+  },
+  {
+    id: 7,
+    url: [
+      {
+        state: 0,
+        src: 'https://cdn.sa.net/2025/11/01/hSYlGCkQBFoXL6g.png',
+        alt: 'O^O'
+      },
+      {
+        state: 1,
+        src: 'https://cdn.sa.net/2025/11/01/eNaMW9Qy5EsHAdK.png',
+        alt: 'TUT'
+      }
+    ],
+    alt: 'O^O'
+  },
 ];
 
 // 辅助函数：获取图片的默认状态URL

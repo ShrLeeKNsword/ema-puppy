@@ -1,5 +1,6 @@
 import oggEma from '../assets/ogg/ema.ogg'
 import mp3Ema2Hiro from '../assets/ogg/ema2hiro.mp3'
+import wavCiallo from '../assets/ogg/ciallo.wav'
 
 // 定义音频对象接口
 export interface AudioItem {
@@ -14,6 +15,11 @@ export const audioList: AudioItem[] = [
     src: oggEma,
     offset: 50, // 0.05秒偏移
     name: 'Kya'
+  },
+  {
+    src: wavCiallo,
+    offset: 0, // 无偏移
+    name: 'Ciallo'
   },
   {
     src: mp3Ema2Hiro,
