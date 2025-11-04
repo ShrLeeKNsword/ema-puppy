@@ -77,7 +77,23 @@ export const images: ImageData[] = [
       }
     ],
     alt: '哈'
-  }
+  },
+  {
+    id: 5,
+    url: [
+      {
+        state: 0,
+        src: 'https://cdn.sa.net/2025/11/01/WkOA7pxLV9d81HY.png',
+        alt: 'O^O'
+      },
+      {
+        state: 1,
+        src: 'https://cdn.sa.net/2025/11/01/k27uKp9taAUJrN8.png',
+        alt: 'TUT'
+      }
+    ],
+    alt: 'O^O'
+  },
 ];
 
 // 辅助函数：获取图片的默认状态URL
