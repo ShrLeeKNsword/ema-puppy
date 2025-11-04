@@ -1,7 +1,9 @@
 import { useState, useEffect, useRef } from 'react'
 import './App.css'
-// 导入音频文件
-import audioFile from './assets/ema.ogg'
+// 导入设置图标
+import { RiSettings5Fill } from 'react-icons/ri'
+// 导入音频列表
+import { audioList } from './data/oggList'
 // 导入图片数据和辅助函数
 import { images, getDefaultImageUrl, getPressedImageUrl, getDefaultImageAlt, getPressedImageAlt } from './data/img'
 import type { ImageData } from './data/img'
@@ -29,6 +31,35 @@ export const incrementLocalClickCount = (): number => {
   } catch (error) {
     console.error('增加本地计数失败:', error);
     return getLocalClickCount();
+  }
+};
+
+// 从本地存储获取音频设置
+  const getAudioSettings = (): Set<string> => {
+  try {
+    const settings = localStorage.getItem('audio_settings');
+    if (settings) {
+      const parsed = JSON.parse(settings);
+      // 检查数据结构是否正确，如果不正确则返回默认值
+      if (Array.isArray(parsed)) {
+        return new Set(parsed);
+      }
+    }
+    // 默认启用所有音频
+    return new Set(audioList.map(audio => audio.name));
+  } catch (error) {
+    console.error('获取音频设置失败:', error);
+    // 出错时默认启用所有音频
+    return new Set(audioList.map(audio => audio.name));
+  }
+};
+
+// 保存音频设置到本地存储
+  const saveAudioSettings = (settings: Set<string>): void => {
+  try {
+    localStorage.setItem('audio_settings', JSON.stringify(Array.from(settings)));
+  } catch (error) {
+    console.error('保存音频设置失败:', error);
   }
 };
 import { artists } from './data/artists';
@@ -84,6 +115,72 @@ export const cacheImage = (url: string, data: string, alt: string): void => {
     localStorage.setItem(`image_cache_${url}`, JSON.stringify(cachedImage));
   } catch (error) {
     console.error('缓存图片失败:', error);
+    // 尝试清理旧缓存
+    if (error instanceof Error && error.name === 'QuotaExceededError') {
+      cleanOldCache();
+      try {
+        // 再次尝试缓存
+        const cachedImage: CachedImage = {
+          data,
+          timestamp: Date.now(),
+          alt
+        };
+        localStorage.setItem(`image_cache_${url}`, JSON.stringify(cachedImage));
+        console.log('清理旧缓存后成功缓存图片');
+      } catch (retryError) {
+        console.error('清理旧缓存后仍无法缓存图片:', retryError);
+        // 最后尝试：只缓存重要的小图片，跳过大数据
+        if (data.length < 100000) { // 小于100KB的图片
+          try {
+            const cachedImage: CachedImage = {
+              data,
+              timestamp: Date.now(),
+              alt
+            };
+            localStorage.setItem(`image_cache_${url}`, JSON.stringify(cachedImage));
+          } catch (finalError) {
+            console.error('最终缓存尝试失败:', finalError);
+          }
+        }
+      }
+    }
+  }
+};
+
+// 清理旧缓存
+export const cleanOldCache = (): void => {
+  try {
+    // 收集所有缓存项
+    const cacheItems: {key: string, timestamp: number}[] = [];
+    
+    for (let i = 0; i < localStorage.length; i++) {
+      const key = localStorage.key(i);
+      if (key && (key.startsWith('image_cache_') || key.startsWith('audio_cache_'))) {
+        try {
+          const cached = localStorage.getItem(key);
+          if (cached) {
+            const parsed = JSON.parse(cached);
+            if (parsed.timestamp) {
+              cacheItems.push({key, timestamp: parsed.timestamp});
+            }
+          }
+        } catch (e) {
+          // 忽略无效的缓存项
+        }
+      }
+    }
+    
+    // 按时间戳排序，删除最旧的50%缓存
+    cacheItems.sort((a, b) => a.timestamp - b.timestamp);
+    const itemsToDelete = cacheItems.slice(0, Math.floor(cacheItems.length * 0.5));
+    
+    itemsToDelete.forEach(item => {
+      localStorage.removeItem(item.key);
+    });
+    
+    console.log(`已清理 ${itemsToDelete.length} 个旧缓存项`);
+  } catch (error) {
+    console.error('清理旧缓存失败:', error);
   }
 };
 
@@ -165,7 +262,6 @@ export const loadAudioAsBase64 = (url: string): Promise<string> => {
 export const preloadAndCacheAudio = async (audioUrl: string): Promise<string> => {
   try {
     const audioData = await loadAudioAsBase64(audioUrl);
-    console.log('音频已预加载并缓存');
     return audioData;
   } catch (error) {
     console.error('预加载音频失败:', error);
@@ -278,10 +374,14 @@ function App() {
   const [showRedFilter, setShowRedFilter] = useState(false);
   // 是否显示艺术家信息模态框
   const [showArtistModal, setShowArtistModal] = useState(false);
+  // 是否显示设置模态框
+  const [showSettingsModal, setShowSettingsModal] = useState(false);
+  // 存储已缓存的音频URL列表
+  const [cachedAudioUrls, setCachedAudioUrls] = useState<Map<string, string>>(new Map());
+  // 存储启用的音频设置
+  const [enabledAudios, setEnabledAudios] = useState<Set<string>>(new Set());
   // 长按定时器引用
   const longPressTimerRef = useRef<number | null>(null);
-  // 预加载的音频数据URL
-  const [cachedAudioUrl, setCachedAudioUrl] = useState<string>(audioFile);
   // 控制移动端触摸状态（用于动画）
   const [isTouching, setIsTouching] = useState(false);
   
@@ -290,14 +390,29 @@ function App() {
     // 预加载所有图片到缓存
     preloadAndCacheImages(images);
     
-    // 预加载音频到缓存
-    const loadAudio = async () => {
+    // 加载所有音频
+    const loadAllAudios = async () => {
       try {
-        const audioData = await preloadAndCacheAudio(audioFile);
-        setCachedAudioUrl(audioData);
+        const newCachedUrls = new Map<string, string>();
+        
+        // 并行预加载所有音频
+        const preloadPromises = audioList.map(async (audioItem) => {
+          try {
+            const cachedAudio = await preloadAndCacheAudio(audioItem.src);
+            newCachedUrls.set(audioItem.src, cachedAudio);
+            console.log(`音频 ${audioItem.name} 已预加载并缓存`);
+          } catch (error) {
+            console.error(`加载音频 ${audioItem.name} 失败:`, error);
+            newCachedUrls.set(audioItem.src, audioItem.src); // 使用原始URL作为后备
+          }
+        });
+        
+        await Promise.all(preloadPromises);
+        setCachedAudioUrls(newCachedUrls);
+        
+        console.log('所有音频已预加载完成');
       } catch (error) {
-        console.error('音频预加载失败:', error);
-        // 如果预加载失败，继续使用原始URL
+        console.error('加载音频失败:', error);
       }
     };
     
@@ -335,8 +450,11 @@ function App() {
     };
     
     // 并行加载音频和图片
-    loadAudio();
+    loadAllAudios();
     loadRandomImage();
+    
+    // 加载音频设置
+    setEnabledAudios(getAudioSettings());
   }, []);
 
   // 清理定时器
@@ -348,14 +466,50 @@ function App() {
     };
   }, []);
 
+  // 从启用的音频中随机获取一个
+  const getRandomEnabledAudio = (): typeof audioList[0] => {
+    const enabledAudioItems = audioList.filter(audio => enabledAudios.has(audio.name));
+    // 如果没有启用的音频，则返回第一个音频作为后备
+    if (enabledAudioItems.length === 0) {
+      return audioList[0];
+    }
+    const randomIndex = Math.floor(Math.random() * enabledAudioItems.length);
+    return enabledAudioItems[randomIndex];
+  };
+
   // 播放音频并增加点击计数函数
   const playSound = () => {
     if (!hasPlayed) {
-        const audio = new Audio(cachedAudioUrl);
-        // 设置音频起始位置，跳过开头无声音的部分（根据实际情况调整时间值）
-        audio.currentTime = 0.05; // 跳过前0.1秒
+        // 从启用的音频中随机获取一个
+        const audioItem = getRandomEnabledAudio();
+        
+        console.log(`选择的音频: ${audioItem.name}, 偏移: ${audioItem.offset}ms`);
+        
+        // 获取缓存的音频URL
+        const audioUrl = cachedAudioUrls.get(audioItem.src) || audioItem.src;
+        console.log(`使用的音频URL: ${audioUrl}`);
+        
+        const audio = new Audio(audioUrl);
+        
+        // 应用音频偏移（如果有）
+        if (audioItem.offset > 0) {
+          audio.currentTime = audioItem.offset / 1000; // 转换为秒
+          console.log(`应用音频偏移: ${audioItem.offset}ms`);
+        } else {
+          console.log(`无偏移应用`);
+        }
+        
+        // 监听音频播放事件
+        audio.addEventListener('play', () => {
+          console.log(`音频 ${audioItem.name} 开始播放`);
+        });
+        
+        audio.addEventListener('error', (e) => {
+          console.error(`音频 ${audioItem.name} 播放错误:`, e);
+        });
+        
         audio.play().catch(error => {
-          console.error('音频播放失败:', error);
+          console.error(`音频 ${audioItem.name} 播放失败:`, error);
         });
         setHasPlayed(true);
 
@@ -544,9 +698,96 @@ function App() {
         艾玛累计一共Kya了 {clickCount} 次
       </div>
       <div className="buttons-container">
-        <Button type="tertiary" onClick={() => window.open('https://space.bilibili.com/403314450', '_blank')}>网站作者</Button>
-        <Button type="tertiary" onClick={() => setShowArtistModal(true)}>图片画师</Button>
+        <Button type="tertiary" onClick={() => window.open('https://space.bilibili.com/403314450', '_blank')}>作者</Button>
+        <Button type="tertiary" onClick={() => setShowArtistModal(true)}>画师</Button>
+        <Button type="tertiary" onClick={() => setShowSettingsModal(true)}>
+          <RiSettings5Fill style={{ marginRight: '4px' }} />
+          设置
+        </Button>
       </div>
+      
+      {/* 设置模态框 */}
+      {showSettingsModal && (
+        <div style={{
+          position: 'fixed',
+          top: 0,
+          left: 0,
+          right: 0,
+          bottom: 0,
+          backgroundColor: 'rgba(0, 0, 0, 0.5)',
+          display: 'flex',
+          alignItems: 'center',
+          justifyContent: 'center',
+          zIndex: 1000
+        }}>
+          <div style={{
+            backgroundColor: 'white',
+            borderRadius: '8px',
+            padding: '24px',
+            width: '90%',
+            maxWidth: '400px',
+            boxShadow: '0 4px 12px rgba(0, 0, 0, 0.15)'
+          }}>
+            <h3 style={{ marginTop: 0, marginBottom: '16px' }}>音频设置</h3>
+            
+            <div style={{ marginBottom: '24px' }}>
+              <h4 style={{ marginBottom: '12px', fontSize: '16px' }}>启用的音频</h4>
+              {audioList.map(audio => (
+                <div key={audio.name} style={{
+                  display: 'flex',
+                  alignItems: 'center',
+                  marginBottom: '8px'
+                }}>
+                  <input
+                    type="checkbox"
+                    id={`audio-${audio.name}`}
+                    checked={enabledAudios.has(audio.name)}
+                    onChange={(e) => {
+                      const newEnabledAudios = new Set(enabledAudios);
+                      if (e.target.checked) {
+                        newEnabledAudios.add(audio.name);
+                      } else {
+                        newEnabledAudios.delete(audio.name);
+                      }
+                      // 至少保留一个音频启用
+                      if (newEnabledAudios.size === 0) {
+                        newEnabledAudios.add(audio.name);
+                      }
+                      setEnabledAudios(newEnabledAudios);
+                      saveAudioSettings(newEnabledAudios);
+                    }}
+                    style={{ marginRight: '8px' }}
+                  />
+                  <label htmlFor={`audio-${audio.name}`} style={{ fontSize: '14px' }}>
+                    {audio.name}
+                  </label>
+                </div>
+              ))}
+            </div>
+            
+            <div style={{ display: 'flex', justifyContent: 'flex-end' }}>
+              <Button
+                type="tertiary"
+                onClick={() => setShowSettingsModal(false)}
+                style={{ marginLeft: '8px' }}
+              >
+                关闭
+              </Button>
+              <Button
+                onClick={() => {
+                  // 重置为默认设置（启用所有音频）
+                  const defaultSettings = new Set(audioList.map(audio => audio.name));
+                  setEnabledAudios(defaultSettings);
+                  saveAudioSettings(defaultSettings);
+                }}
+                style={{ marginLeft: '8px' }}
+              >
+                重置
+              </Button>
+            </div>
+          </div>
+        </div>
+      )}
       
       {/* 原生React实现的模态框 */}
       {showArtistModal && (

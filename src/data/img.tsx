@@ -20,15 +20,15 @@ export const images: ImageData[] = [
       {
         state: 0,
         src: 'https://cdn.sa.net/2025/11/01/eNaMW9Qy5EsHAdK.png',
-        alt: '>_<'  
+        alt: '>_<'
       },
       {
         state: 1,
         src: 'https://cdn.sa.net/2025/11/01/k27uKp9taAUJrN8.png',
-        alt: '>U<'  
+        alt: '>U<'
       }
     ],
-    alt: '>U<'  
+    alt: '>U<'
   },
   {
     id: 2,
@@ -36,19 +36,30 @@ export const images: ImageData[] = [
       {
         state: 0,
         src: 'https://cdn.sa.net/2025/11/01/WkOA7pxLV9d81HY.png',
-        alt: 'O^O'  
+        alt: 'O^O'
       },
       {
         state: 1,
         src: 'https://cdn.sa.net/2025/11/01/hSYlGCkQBFoXL6g.png',
-        alt: 'O^O'  
+        alt: 'O^O'
       }
     ],
-    alt: 'O^O'  
+    alt: 'O^O'
   },
   {
     id: 3,
-    url: 'https://cdn.sa.net/2025/11/01/EeAl94KrsCNPGtZ.png',
+    url: [
+      {
+        state: 0,
+        src: 'https://cdn.sa.net/2025/11/01/EeAl94KrsCNPGtZ.png',
+        alt: 'doro1'
+      },
+      {
+        state: 1,
+        src: 'https://cdn.sa.net/2025/11/04/8T975vIU1aQ6NVB.png',
+        alt: 'doro2'
+      },
+    ],
     alt: 'doro'
   },
   {
@@ -57,12 +68,12 @@ export const images: ImageData[] = [
       {
         state: 0,
         src: 'https://cdn.sa.net/2025/11/03/1q28KfiSzFUEXT4.png',
-        alt: '蓄力'  
+        alt: '蓄力'
       },
       {
         state: 1,
         src: 'https://cdn.sa.net/2025/11/03/ZOkJC3HQt2WYISe.png',
-        alt: '哈'  
+        alt: '哈'
       }
     ],
     alt: '哈'
